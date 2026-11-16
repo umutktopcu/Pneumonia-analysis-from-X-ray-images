@@ -1,0 +1,19 @@
+# Dataset: download from Kaggle (see README). Never commit it (size + licensing).
+data/
+
+# Model weights and large training artifacts
+*.pt
+*.pth
+*.ckpt
+checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+__MACOSX/

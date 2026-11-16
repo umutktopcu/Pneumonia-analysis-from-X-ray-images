@@ -1,0 +1,43 @@
+
+=== Class counts per split ===
+label  NORMAL  PNEUMONIA   All  pneumonia_ratio
+split                                          
+train    1341       3875  5216            0.743
+val         8          8    16            0.500
+test      234        390   624            0.625
+All      1583       4273  5856            0.730
+
+=== Subtypes per split ===
+subtype  bacteria  normal  virus
+split                           
+train        2530    1341   1345
+val             8       8      0
+test          242     234    148
+
+=== Filenames not matching known patterns ===
+0 files
+
+=== Image size by class (pixels) ===
+          width               height              
+            min  median   max    min  median   max
+label                                             
+NORMAL      912  1654.0  2916    496  1323.0  2713
+PNEUMONIA   384  1160.0  2772    127   776.0  2304
+
+=== Color mode by class ===
+mode          L  RGB
+label               
+NORMAL     1583    0
+PNEUMONIA  3990  283
+
+=== Images per patient by class ===
+            count  mean  50%   max
+label                             
+NORMAL     1444.0  1.10  1.0   4.0
+PNEUMONIA  1674.0  2.55  2.0  31.0
+
+=== Patient IDs shared between splits (leakage risk) ===
+{'train & val': 0, 'train & test': 170, 'val & test': 0}
+
+=== Exact duplicate files (MD5) ===
+{'duplicate_groups': 30, 'groups_spanning_splits': 0, 'groups_with_conflicting_labels': 0}

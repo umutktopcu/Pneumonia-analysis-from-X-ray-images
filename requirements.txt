@@ -1,0 +1,5 @@
+# Stage 1 (data exploration)
+numpy
+pandas
+matplotlib
+pillow
