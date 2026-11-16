@@ -1,0 +1,22 @@
+=== Exclusions from training pool ===
+exclude_reason
+kept               5377
+patient_in_test     457
+duplicate_md5        22
+Name: count, dtype: int64
+
+=== Final splits ===
+label  NORMAL  PNEUMONIA  total  pneumonia_ratio  patients
+split                                                     
+train    1078       2723   3801            0.716      2123
+val       270        682    952            0.716       568
+test      234        390    624            0.625       427
+
+=== Subtypes per split ===
+subtype  bacteria  normal  virus
+split                           
+train        1741    1078    982
+val           427     270    255
+test          242     234    148
+
+All leakage checks passed.
