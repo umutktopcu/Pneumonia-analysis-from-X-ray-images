@@ -1,0 +1,5 @@
+Separability max(AUC, 1-AUC) on the full train split (n=3801). 0.5 = no class info.
+
+             black_frac  side_band_mean  mean_intensity  hf_energy
+sq224             0.702           0.616           0.518      0.863
+sq224_clahe       0.743           0.664           0.579      0.820

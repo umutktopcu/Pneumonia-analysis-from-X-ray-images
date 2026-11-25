@@ -56,9 +56,63 @@ Notebooks: the dataset is hosted there and long runs would throttle the fanless 
 
 ---
 
+## D6 — Resize by squashing to 224x224 with INTER_AREA (Stage 3, 2026-11-16)
+**Options compared** (`src/03a_resize_study.py`, `outputs/03_preprocessing/`): squash, pad to square
+(black borders), center square crop. Measured how well non-anatomical statistics separate the classes
+after each strategy (max(AUC,1-AUC), train sample n=600; 0.5 = no information):
+
+| strategy | black_frac | side_band_mean | mean_intensity |
+|---|---|---|---|
+| squash | 0.71 | 0.62 | 0.55 |
+| pad | 0.78 | 0.55 | 0.74 |
+| center_crop | 0.79 | 0.65 | 0.65 |
+
+**Why squash:** keeps the whole lung field (center crop cuts the lateral lungs of wide pneumonia images;
+peripheral pneumonia would be lost irrecoverably), shows the weakest non-anatomical cues overall, and is
+the simplest option. Pad produces black bars whose thickness directly encodes the aspect ratio (pneumonia
+images are wider) and wastes ~40 % of the input on those images.
+**Why INTER_AREA:** downsampling is ~7x; INTER_AREA averages all source pixels under each output pixel
+(acts as an anti-aliasing low-pass filter). INTER_NEAREST/INTER_LINEAR create moiré/false texture
+(`aliasing_demo.png`), and because NORMAL images are larger (downsampled more), aliasing would be
+class-dependent: texture separability rose 0.876 → 0.898 with INTER_LINEAR.
+**Why 224:** native input size of the ImageNet-pretrained backbones planned for Stage 5.
+**Known risk:** squashing distorts wider (mostly pneumonia) images more; the model could learn the
+distortion. Check with Grad-CAM (Stage 7). Fallback: content-aware body-box crop (Otsu + largest contour).
+
+## D7 — CLAHE off by default; kept as an ablation (Stage 3, 2026-11-16)
+**Applied after resizing** when used, so the 8x8 tile grid covers the same relative area in every image
+(before resizing, tile size would depend on original resolution, which differs by class).
+**Evidence** (`src/03b_clahe_study.py`, full train split n=3801): CLAHE *increases* the separability of
+non-anatomical cues (black_frac 0.70 → 0.74, side_band_mean 0.62 → 0.66, mean_intensity 0.52 → 0.58).
+Visually it also boosts laterality markers and bowel gas, and raises local contrast inside hazy lungs —
+plausibly weakening the very opacity signal that marks pneumonia (hypothesis, not tested).
+**Decision:** baseline pipeline without CLAHE; train one model on `sq224_clahe` in Stage 5 as an ablation
+and keep CLAHE only if it improves validation performance.
+
+## D8 — Training augmentation: small, realistic, label-preserving only (Stage 3, 2026-11-16)
+**Rule used:** an augmentation is kept only if (1) the label is unchanged and (2) the result could occur
+in real acquisitions.
+**Kept** (train split only, `src/dataset.py`): rotation ±10°, translation ±5 %, scale 0.95–1.05
+(patient positioning), brightness/contrast ±10 % (exposure).
+**Rejected:** horizontal flip (label-invariant, but produces mirrored anatomy — heart on the right,
+mirrored "R" markers — never seen at test time; lungs are anatomically asymmetric; course slide Hafta 4
+#40), vertical flip / large rotations (unrealistic), blur (NORMAL images are measurably sharper, so blur
+can push a NORMAL image towards the PNEUMONIA look — effectively label noise), random erasing (can delete
+the lesion). Brightness kept small because opacity = brighter lung regions is part of the disease signal.
+
+## D9 — Normalization: /255, replicate to 3 channels, ImageNet mean/std (Stage 3, 2026-11-16)
+Pretrained filters were learned on inputs standardized with ImageNet statistics; matching that input
+distribution is what makes the transferred features usable. No per-image min-max (course slide #60):
+it rescales each image by its own extremes and erases absolute brightness, which carries the opacity
+signal.
+
 ## Known open issues (to address in later stages)
 - **Image-size shortcut:** NORMAL images are much larger (median 1654x1323 vs 1160x776). Width
   alone gives test AUC 0.95; an aspect-ratio rule gets 68.6 % test accuracy without pixels.
   → Stage 3: choose resizing deliberately; Stage 4: report a metadata-only baseline;
   Stage 7: check Grad-CAM for non-lung focus.
 - **Laterality markers ("R")** in consistent positions, visible in the NORMAL mean image.
+- **Texture/sharpness differs by class** (`hf_energy`, separability 0.86 after preprocessing): NORMAL
+  images are sharper even at matched original width (0.81 in the 1100–1500 px band), so it is not a
+  resizing artifact. Could be genuine disease signal (opacities blur vessels/ribs) or acquisition
+  differences; this dataset cannot tell them apart.

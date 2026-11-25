@@ -1,5 +1,10 @@
-# Stage 1 (data exploration)
-numpy
-pandas
-matplotlib
-pillow
+# Pinned versions used for this project (MacBook Air M5, Python venv, 2026-11).
+# Stage 1-2: data exploration and splitting
+numpy==2.5.5
+pandas==3.1.1
+matplotlib==3.11.2
+pillow==13.0.0
+# Stage 3+: preprocessing and training
+opencv-python==5.0.0.93
+torch==2.15.0
+torchvision==0.29.2

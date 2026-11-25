@@ -1,0 +1,8 @@
+Separability max(AUC, 1-AUC) of non-anatomical features, train sample n=600 (300/class). 0.5 = no class info.
+
+                        reference  black_frac  side_band_mean  mean_intensity  hf_energy
+(raw) aspect ratio w/h      0.859         NaN             NaN             NaN        NaN
+squash                        NaN       0.710           0.621           0.545      0.876
+pad                           NaN       0.776           0.548           0.740      0.917
+center_crop                   NaN       0.787           0.650           0.653      0.930
+squash (INTER_LINEAR)         NaN       0.709           0.621           0.545      0.898

@@ -12,7 +12,7 @@ Deep learning study for NORMAL vs PNEUMONIA classification on the Kaggle
 |---|---|---|
 | 1 | Dataset exploration | ✅ |
 | 2 | Leakage-aware patient-level split | ✅ |
-| 3 | Preprocessing & augmentation | ⏳ |
+| 3 | Preprocessing & augmentation | ✅ |
 | 4 | Baselines (majority class, metadata-only, small CNN) | ⏳ |
 | 5 | Transfer learning | ⏳ |
 | 6 | Evaluation (sensitivity, specificity, ROC-AUC, threshold) | ⏳ |
@@ -24,6 +24,10 @@ Deep learning study for NORMAL vs PNEUMONIA classification on the Kaggle
   We keep the official test set and remove those patients' 457 images from training ([D2](DECISIONS.md)).
 - **Shortcuts in the data:** RGB images occur only in the pneumonia class; image width alone reaches
   test AUC 0.95; laterality markers sit in consistent positions. See [DECISIONS.md](DECISIONS.md).
+- **Preprocessing chosen by measurement, not by habit:** squash to 224x224 with anti-aliased `INTER_AREA`
+  (pad/crop left stronger non-anatomical cues or cut the lungs), CLAHE off by default because it amplified
+  those cues (kept as an ablation), augmentation limited to realistic, label-preserving transforms
+  (no flips, no blur). Decisions D6–D9.
 
 ## Data splits (stage 2)
 
@@ -34,18 +38,22 @@ Deep learning study for NORMAL vs PNEUMONIA classification on the Kaggle
 | test (official) | 234 | 390 | 427 |
 
 ## Reproduce
+0. Create an environment: `python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`
 1. Download the dataset from Kaggle (`paultimothymooney/chest-xray-pneumonia`) and unzip so that
    `data/chest_xray/train`, `data/chest_xray/val` and `data/chest_xray/test` exist.
 2. Run from the project root:
    ```bash
-   pip install -r requirements.txt
    python src/01_explore_dataset.py   # -> outputs/01_exploration/
    python src/02_make_splits.py       # -> outputs/02_splits/splits.csv
+   python src/03_preprocess.py        # -> data/processed/sq224/        (224x224 grayscale PNG cache)
+   python src/03_preprocess.py --clahe  # -> data/processed/sq224_clahe/ (ablation variant)
+   python src/03c_check_dataset.py    # sanity checks for the PyTorch Dataset
    ```
 
 ## Repository layout
 ```
-src/            numbered scripts, one per stage
+src/            numbered scripts per stage (03a/03b = studies behind decisions D6/D7)
+                + shared modules: preprocessing.py, dataset.py, shortcut_checks.py
 outputs/        generated summaries, figures and split files
 DECISIONS.md    every methodological decision with rationale and rejected alternatives
 ```
