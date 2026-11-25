@@ -187,6 +187,34 @@ Kaggle T4. "conflict" = shortcut-conflicting subset (val 194 / test 104 images).
 - Every additional experiment judged on test increases the risk of adapting to the test set (test reuse);
   further experiments must be few and declared in advance.
 
+## D13 — Primary operating point: sensitivity ≥ 95 % on validation (Stage 6, 2026-11-25)
+**Decision (user + assistant):** the reported operating point of every model is the highest threshold whose
+VAL sensitivity is ≥ 95 % (`metrics.threshold_for_sensitivity`); val-Youden results are reported as a
+secondary table. **Why:** pneumonia detection is a screening task — missing a case is costlier than a false
+alarm — so the clinically meaningful question is "catch ≥ 95 % of cases, then minimize false alarms".
+Youden weights both errors equally. The rule was proposed before its test results were computed; it is a
+clinical choice, not a test-optimized one. **Cost:** on test, more missed cases than Youden (e.g. ResNet-18
+FT: FN 1 → 9) for far fewer false alarms (FP 73 → 40).
+
+## Stage 6 findings (2026-11-25) — `src/06_evaluation.py`, `outputs/06_evaluation/`
+- **Paired bootstrap (same resampled test images for both models, 2000 rounds, class-stratified):**
+  ResNet-18 FT, ResNet-18 FT + CLAHE and DenseNet-121 FT are consistently better than SmallCNN, frozen
+  ResNet-18 and EfficientNet-B0 (CIs of the AUC difference exclude 0, e.g. DenseNet − EfficientNet
+  +0.039 [0.019, 0.061]). DenseNet vs ResNet-18 FT: no consistent difference. ResNet-18 + CLAHE vs ResNet-18:
+  +0.010 [0.002, 0.021] on test, but (a) 15 pairwise comparisons were made, so one or two "consistent"
+  results are expected by chance; (b) the bootstrap only covers test-sample uncertainty, not training
+  randomness (single seed); (c) D7 required CLAHE to improve VAL (val AUC 0.9992 vs 0.9993: no). → CLAHE stays
+  off; the test hint is reported as exploratory.
+- **Threshold rules (thresholds always from val; the "oracle" uses test labels and is shown only for scale):**
+  val Youden → test sens 0.97–1.00, spec 0.59–0.79. Val "sensitivity ≥ 95 %" → spec improves for every
+  fine-tuned model (e.g. ResNet-18: FP 73 → 40) at the cost of more misses (FN 1 → 9). Oracle test-Youden reaches
+  spec ≈ 0.85–0.92: the gap is the price of the val→test shift. Hypothesis "Youden picks the low end of a
+  plateau of tied thresholds" was checked and rejected (max J is unique for every model).
+- **Shared errors:** of 234 test NORMAL images, 117 are misclassified by no model and 27 by all six (48 by ≥5).
+  Errors are concentrated in the same images and follow image size: median original height 1484 px (0 models
+  wrong), 1275 (1–2), 1087 (3–4), 942 px (5–6). The failure is a property of those images (acquisition /
+  size cue, possibly label issues), not of one architecture. Candidates for Grad-CAM in Stage 7.
+
 ## Known open issues (to address in later stages)
 - **Image-size shortcut:** NORMAL images are much larger (median 1654x1323 vs 1160x776). Width
   alone gives test AUC 0.95; an aspect-ratio rule gets 68.6 % test accuracy without pixels.

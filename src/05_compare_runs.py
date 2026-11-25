@@ -13,37 +13,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from metrics import roc_auc
+from metrics import bootstrap_auc_ci, roc_auc
+from runs import RUNS, load_predictions
 from size_baseline import conflicting_relpaths
 
-RUNS = Path("outputs/runs")
 OUT = Path("outputs/05_transfer/comparison.csv")
-N_BOOT = 2000
-SEED = 42
 
 
 def bce(y, p, eps=1e-7) -> float:
     p = np.clip(p, eps, 1 - eps)
     return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
-
-
-def bootstrap_auc_ci(y, s, n=N_BOOT, seed=SEED):
-    """95% CI of ROC-AUC, resampling positives and negatives separately (keeps class balance)."""
-    rng = np.random.default_rng(seed)
-    pos, neg = s[y == 1], s[y == 0]
-    aucs = []
-    for _ in range(n):
-        bp, bn = rng.choice(pos, len(pos)), rng.choice(neg, len(neg))
-        aucs.append(roc_auc(np.r_[np.ones(len(bp)), np.zeros(len(bn))], np.r_[bp, bn]))
-    return np.percentile(aucs, [2.5, 97.5])
-
-
-def load_predictions(run_dir: Path) -> pd.DataFrame:
-    pr = pd.read_csv(run_dir / "predictions.csv")
-    # path like .../processed/sq224[_clahe]/test/NORMAL/x.png -> relpath test/NORMAL/x.jpeg
-    pr["relpath"] = (pr["path"].str.replace(r"^.*?/sq224(_clahe)?/", "", regex=True)
-                     .str.replace(".png", ".jpeg", regex=False))
-    return pr
 
 
 def main():
