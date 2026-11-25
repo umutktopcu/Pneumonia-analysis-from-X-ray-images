@@ -1,0 +1,22 @@
+{
+  "run_name": "smallcnn_posweight",
+  "model": "small_cnn",
+  "variant": "sq224",
+  "pos_weight": "auto",
+  "epochs": 25,
+  "patience": 5,
+  "batch_size": 32,
+  "lr": 0.001,
+  "weight_decay": 0.0001,
+  "seed": 42,
+  "limit": 0,
+  "splits": "outputs/02_splits/splits.csv",
+  "processed": "data/processed",
+  "device": "mps",
+  "n_train": 3801,
+  "n_pos": 2723,
+  "n_neg": 1078,
+  "pos_weight_value": 0.3958868980407715,
+  "n_params": 389153,
+  "torch": "2.15.0"
+}

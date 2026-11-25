@@ -1,0 +1,4 @@
+dHash 16x16 = 256 bits
+random pairs: min 19, 1% 38, median 73
+val  -> nearest train: min 16, 1% 19, median 34, below random-pair minimum: 10
+test -> nearest train: min 16, 1% 17, median 32, below random-pair minimum: 9

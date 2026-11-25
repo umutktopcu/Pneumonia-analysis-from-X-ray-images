@@ -13,7 +13,7 @@ Deep learning study for NORMAL vs PNEUMONIA classification on the Kaggle
 | 1 | Dataset exploration | ✅ |
 | 2 | Leakage-aware patient-level split | ✅ |
 | 3 | Preprocessing & augmentation | ✅ |
-| 4 | Baselines (majority class, metadata-only, small CNN) | ⏳ |
+| 4 | Baselines (majority class, metadata-only, small CNN) | ✅ |
 | 5 | Transfer learning | ⏳ |
 | 6 | Evaluation (sensitivity, specificity, ROC-AUC, threshold) | ⏳ |
 | 7 | Grad-CAM explainability | ⏳ |
@@ -28,6 +28,17 @@ Deep learning study for NORMAL vs PNEUMONIA classification on the Kaggle
   (pad/crop left stronger non-anatomical cues or cut the lungs), CLAHE off by default because it amplified
   those cues (kept as an ablation), augmentation limited to realistic, label-preserving transforms
   (no flips, no blur). Decisions D6–D9.
+
+## Results so far (test set = official 624 images; threshold chosen on val)
+
+| Model | Test ROC-AUC | Accuracy | Sensitivity | Specificity |
+|---|---|---|---|---|
+| Always "pneumonia" | 0.500 | 0.625 | 1.000 | 0.000 |
+| Logistic regression on original image size only (no pixels) | 0.911 | 0.833 | 0.879 | 0.756 |
+| SmallCNN from scratch (0.39 M params) | 0.945 | 0.843 | 0.992 | 0.594 |
+
+The CNN reaches val AUC 0.998 but test AUC 0.945; test NORMAL images are often called pneumonia, and CNN
+scores correlate with original image height — see Stage 4 findings in [DECISIONS.md](DECISIONS.md).
 
 ## Data splits (stage 2)
 
@@ -48,6 +59,9 @@ Deep learning study for NORMAL vs PNEUMONIA classification on the Kaggle
    python src/03_preprocess.py        # -> data/processed/sq224/        (224x224 grayscale PNG cache)
    python src/03_preprocess.py --clahe  # -> data/processed/sq224_clahe/ (ablation variant)
    python src/03c_check_dataset.py    # sanity checks for the PyTorch Dataset
+   python src/04a_pixel_free_baselines.py   # majority + image-size-only baselines
+   python src/train.py --run-name smallcnn_noweight   # SmallCNN (~25 s/epoch on an M5 MacBook Air, MPS)
+   python src/04c_near_duplicates.py        # perceptual-hash leakage check
    ```
 
 ## Repository layout

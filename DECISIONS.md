@@ -106,6 +106,48 @@ distribution is what makes the transferred features usable. No per-image min-max
 it rescales each image by its own extremes and erases absolute brightness, which carries the opacity
 signal.
 
+## D10 — Evaluation protocol (Stage 4, 2026-11-25)
+- Positive class = PNEUMONIA. Always report sensitivity AND specificity (plus precision, F1, accuracy,
+  balanced accuracy, ROC-AUC, confusion counts) — `src/metrics.py`, numpy-only, self-tested.
+- Primary comparison metric: ROC-AUC (threshold-free). Decision threshold: chosen on VAL only
+  (Youden J = sensitivity + specificity − 1 by default); TEST is only reported, never used for choices.
+- Every model is compared against two pixel-free baselines (`src/04a_pixel_free_baselines.py`):
+  majority class (test acc 0.625, AUC 0.5) and a logistic regression on original image size
+  (test AUC 0.911, acc 0.833). A CNN that does not clearly beat the size model has not demonstrably
+  learned anything beyond acquisition differences.
+- F1 with PNEUMONIA as positive is inflated by the majority class (always-PNEUMONIA scores F1 0.769
+  on test), so F1 alone is never used to compare models.
+
+## D11 — Class imbalance: no loss weighting; threshold chosen on val (Stage 4, 2026-11-25)
+Compared on SmallCNN (`src/train.py`, seed 42), identical except for the loss:
+
+| run | val-chosen threshold | test AUC | test sensitivity | test specificity |
+|---|---|---|---|---|
+| (a) plain BCE | 0.834 | 0.945 | 0.992 | 0.594 |
+| (b) BCE, pos_weight = 1078/2723 ≈ 0.40 | 0.957 | 0.945 | 0.995 | 0.603 |
+
+Weighting shifted the scores (and hence the threshold) but not their ranking (identical AUC), as expected.
+The specificity difference is 2 of 234 NORMAL images, well inside noise (SE ≈ √(0.6·0.4/234) ≈ 0.03, single
+seed). Decision: (a), the simpler option. The low test specificity is a distribution-shift problem, which
+loss weighting cannot fix.
+
+## Stage 4 findings (2026-11-25)
+- **SmallCNN (0.39 M params, from scratch): val AUC 0.998, test AUC 0.945** vs metadata-only baseline test AUC
+  0.911. It beats the size shortcut, but by a modest margin; the near-perfect val score does not transfer.
+- **Test NORMAL images look "pneumonia-like" to the model:** median score 0.033 on val NORMAL vs 0.719 on test
+  NORMAL; at the val-chosen threshold 95/234 test NORMAL images are false positives (specificity 0.594).
+- **Evidence consistent with size-shortcut use:** within NORMAL images the CNN score correlates with the
+  original image height (Spearman −0.55 test, −0.47 val); false-positive NORMAL images are shorter (median
+  height 1016 vs 1489 px). Correlation only — shorter images may also differ clinically or by device.
+  The test shift is not explained by height alone (test vs val NORMAL median height 1318 vs 1349 px).
+- **No near-duplicate leakage** (`src/04c_near_duplicates.py`, 256-bit dHash): nearest-train distances are
+  similar for val (median 34) and test (median 32), so val is no closer to train than the independent test
+  set; the closest pairs (distance 16; random pairs ≥ 19) are visibly different children. An 8x8 hash was
+  useless (random X-ray pairs differ by only ~11/64 bits) — perceptual hashes must be calibrated on the data.
+- Val loss spikes (e.g. 1.09 at one epoch, back to 0.04 the next) while val AUC stays ≈0.99: instability /
+  calibration jumps, not overfitting (the lower envelope of val loss keeps falling; no train-val AUC gap).
+  Likely BatchNorm running statistics + constant LR (hypothesis). Model selection uses val AUC, so unaffected.
+
 ## Known open issues (to address in later stages)
 - **Image-size shortcut:** NORMAL images are much larger (median 1654x1323 vs 1160x776). Width
   alone gives test AUC 0.95; an aspect-ratio rule gets 68.6 % test accuracy without pixels.
