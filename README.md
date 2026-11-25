@@ -16,7 +16,7 @@ Deep learning study for NORMAL vs PNEUMONIA classification on the Kaggle
 | 4 | Baselines (majority class, metadata-only, small CNN) | ✅ |
 | 5 | Transfer learning | ✅ |
 | 6 | Evaluation (sensitivity, specificity, ROC-AUC, threshold) | ✅ |
-| 7 | Grad-CAM explainability | ⏳ |
+| 7 | Grad-CAM explainability | ✅ |
 
 ## Key findings so far
 - **Class imbalance:** 74 % pneumonia in train, 62.5 % in test → always-"pneumonia" scores 62.5 % test accuracy.
@@ -63,6 +63,22 @@ Paired bootstrap on test: ResNet-18 FT, ResNet-18 FT + CLAHE and DenseNet-121 FT
 (AUC) than SmallCNN, frozen ResNet-18 and EfficientNet-B0; they are not reliably different from each other.
 27 of 234 test NORMAL images are misclassified by all six models — mostly small original images.
 
+## Why do all models fail on the same healthy children? (Stage 7)
+- 27 of 234 test NORMAL images are misclassified by all six models. Grad-CAM of ResNet-18 pointed at the
+  bottom-right corner, where a burned-in exposure label ("KV59" etc.) is printed.
+- A validated template-matching detector shows the label occurs **only in pneumonia images in train/val**
+  (0 of 1,348 normals) but on 18 test normals — 13 of which every model calls pneumonia.
+- Erasing the text barely changes predictions, so the text is not the cause: KV images are a distinct
+  acquisition subgroup (brighter, smaller). Training contains no healthy children from that subgroup.
+- Lesson: Grad-CAM generated a plausible but wrong causal story; only an intervention could test it.
+
+## Comparison with published results
+The dataset's original paper (Kermany et al., 2018) reported ~92.8 % accuracy on the official test set; our
+models reach 0.920–0.929 at the pre-stated operating point (test AUC 0.971–0.981). Higher published numbers
+(96–99 %) mostly come from re-splitting the data so the test set matches the training distribution (our own
+validation accuracy is ~0.99), from image-level splits, or from tuning on the test set (a test-tuned threshold
+alone adds up to ~5 points here). See DECISIONS.md.
+
 ## Data splits (stage 2)
 
 | Split | NORMAL | PNEUMONIA | Patients |
@@ -89,6 +105,9 @@ Paired bootstrap on test: ResNet-18 FT, ResNet-18 FT + CLAHE and DenseNet-121 FT
    #   python src/train.py --run-name resnet18_ft --model resnet18 --lr 1e-4 --scheduler cosine --epochs 15 --num-workers 4
    python src/05_compare_runs.py            # comparison table with bootstrap CIs
    python src/06_evaluation.py              # paired bootstrap, thresholds, confusion matrices, error overlap
+   python src/07_gradcam.py                 # Grad-CAM + sanity checks (needs checkpoints/)
+   python src/07a_kv_labels.py              # burned-in "KV" label detector
+   python src/07b_kv_intervention.py        # erase the label and re-score (needs checkpoints/)
    ```
 
 ## Repository layout

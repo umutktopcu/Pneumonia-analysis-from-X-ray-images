@@ -1,0 +1,28 @@
+Test images, D13 threshold. 'called_pneumonia' = number of images predicted PNEUMONIA.
+
+                                                 n  median_score_orig  median_score_masked  called_pneumonia_orig  called_pneumonia_masked
+run                group                                                                                                                  
+densenet121_ft     NORMAL (no KV, control)     216              0.058                0.094                     27                       32
+                   NORMAL + KV                  18              0.829                0.796                     13                       12
+                   PNEUMONIA (no KV, control)  375              0.995                0.995                    365                      371
+                   PNEUMONIA + KV               15              0.978                0.971                     15                       15
+efficientnet_b0_ft NORMAL (no KV, control)     216              0.073                0.065                     30                       29
+                   NORMAL + KV                  18              0.998                0.998                     11                       11
+                   PNEUMONIA (no KV, control)  375              0.999                0.999                    360                      359
+                   PNEUMONIA + KV               15              1.000                1.000                     15                       15
+resnet18_frozen    NORMAL (no KV, control)     216              0.066                0.168                     39                       61
+                   NORMAL + KV                  18              0.970                0.956                     16                       16
+                   PNEUMONIA (no KV, control)  375              0.994                0.995                    364                      369
+                   PNEUMONIA + KV               15              0.997                0.994                     15                       15
+resnet18_ft        NORMAL (no KV, control)     216              0.117                0.348                     24                       30
+                   NORMAL + KV                  18              0.997                0.986                     16                       12
+                   PNEUMONIA (no KV, control)  375              1.000                1.000                    366                      366
+                   PNEUMONIA + KV               15              1.000                0.999                     15                       14
+resnet18_ft_clahe  NORMAL (no KV, control)     216              0.007                0.010                     21                       23
+                   NORMAL + KV                  18              0.982                0.949                     13                       11
+                   PNEUMONIA (no KV, control)  375              1.000                1.000                    365                      365
+                   PNEUMONIA + KV               15              1.000                0.999                     15                       15
+smallcnn_noweight  NORMAL (no KV, control)     216              0.689                0.715                     51                       59
+                   NORMAL + KV                  18              0.997                0.997                     16                       16
+                   PNEUMONIA (no KV, control)  375              1.000                1.000                    369                      371
+                   PNEUMONIA + KV               15              0.998                0.998                     15                       15

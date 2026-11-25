@@ -1,0 +1,21 @@
+uniform map border fraction (outer 12% frame): 0.422
+
+[resnet18_ft] max |local score - Kaggle score| = 4.84e-06 (OK, same model)
+                      score        border_frac       
+                      count median       count median
+group                                                
+NORMAL_mixed             90  0.763          90  0.442
+NORMAL_right_by_all_6   117  0.006         117  0.782
+NORMAL_wrong_by_all_6    27  0.998          27  0.402
+PNEUMONIA               390  1.000         390  0.406
+sanity check: mean correlation trained vs random-weight maps = 0.029 (near 0 expected)
+
+[efficientnet_b0_ft] max |local score - Kaggle score| = 1.13e-05 (OK, same model)
+                      score        border_frac       
+                      count median       count median
+group                                                
+NORMAL_mixed             90  0.646          90  0.438
+NORMAL_right_by_all_6   117  0.006         117  0.764
+NORMAL_wrong_by_all_6    27  0.999          27  0.401
+PNEUMONIA               390  0.999         390  0.548
+sanity check: mean correlation trained vs random-weight maps = -0.199 (near 0 expected)

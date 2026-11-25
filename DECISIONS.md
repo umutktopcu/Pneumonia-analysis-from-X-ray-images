@@ -215,6 +215,50 @@ FT: FN 1 → 9) for far fewer false alarms (FP 73 → 40).
   wrong), 1275 (1–2), 1087 (3–4), 942 px (5–6). The failure is a property of those images (acquisition /
   size cue, possibly label issues), not of one architecture. Candidates for Grad-CAM in Stage 7.
 
+## Stage 7 findings (2026-11-25) — Grad-CAM, KV-label detector, intervention
+Files: `src/07_gradcam.py`, `src/07a_kv_labels.py`, `src/07b_kv_intervention.py`, `outputs/07_gradcam/`.
+- **Checks:** checkpoints reproduce the Kaggle test scores on the Mac (max |diff| 5e-6 / 1e-5) → the explained
+  models are the evaluated ones. Randomization sanity check (Adebayo et al., 2018): trained vs random-weight
+  maps correlate 0.03 (ResNet-18) and −0.20 (EfficientNet) → maps depend on the learned weights.
+- **Grad-CAM (hypothesis generator):** ResNet-18's evidence for PNEUMONIA in NORMAL images that all six
+  models misclassify often sits in the bottom-right corner, where a burned-in exposure label ("KV55/58/59/68/70")
+  is printed. EfficientNet's evidence sits more on the lateral chest wall / frame (median border fraction on true
+  pneumonia 0.55 vs 0.41 for ResNet-18; uniform map 0.42). Maps of confidently NORMAL images are noise after
+  per-image normalization (weak evidence rescaled to [0, 1]) — not interpretable.
+- **KV label prevalence** (template-matching detector, validated 53/53 on hand-labelled test images; first two
+  detector attempts failed validation and were discarded): train NORMAL 0/1078, train PNEUMONIA 143/2723,
+  val NORMAL 0/270, val PNEUMONIA 45/682, **test NORMAL 18/234**, test PNEUMONIA 15/390. In train/val the label
+  occurs only in pneumonia images; in test it also appears on normals, and 13 of those 18 are misclassified by
+  all six models (mean 5.5/6 models wrong vs 1.5/6 for other test normals). Val cannot reveal this failure.
+- **Intervention (erase only the text, no retraining):** predictions barely change (e.g. ResNet-18 FT calls
+  16 → 12 of the 18 KV normals pneumonia; EfficientNet 11 → 11; SmallCNN 16 → 16) → the text itself is NOT the
+  main cause. KV images form an acquisition subgroup: brighter (median mean intensity 0.57 NORMAL+KV vs 0.48)
+  and smaller (median height 1060 vs 1326 px). Hypothesis: the models associate this acquisition appearance with
+  pneumonia because the subgroup has no normal examples in training (n = 18 test normals → hypothesis only).
+- **Lessons:** Grad-CAM localizes coarsely (32x32-px cells in ResNet-18) and produced a plausible but wrong
+  causal story; only the intervention could reject it. Visible black patches (control group) raised false alarms
+  of frozen ResNet-18 from 39 to 61 → models are fragile to out-of-distribution artifacts.
+- **Decision (D14):** no further experiment. Body-box cropping or ensembling do not target the identified cause
+  (missing normal examples from an acquisition subgroup; all models fail on the same images). The fix is data.
+  Avoids another look at the test set.
+
+## Comparison with the literature (searched 2026-11-25)
+- Kermany et al. (2018), the dataset's original paper, reported ~92.8 % test accuracy on the official test set
+  (as cited by arXiv:2601.00837). Our legitimately thresholded models (D13) reach 0.920–0.929 accuracy with test
+  AUC 0.971–0.981 → same range.
+- Much higher published numbers (96–99.5 %) usually measure something easier, not a better model:
+  * re-splitting the data so the test set comes from the training distribution — e.g. a new 80/10/10 split of the
+    training folder (arXiv:2601.00837, ~99 %), merged patient-level re-split (arXiv:2511.00456, 96–98 %), or
+    cross-validation; our own in-distribution val accuracy is ~0.99 too;
+  * image-level random splits (patient leakage, see D3);
+  * choosing threshold / epoch / model on the test set: our oracle analysis shows test-tuned thresholds add up to
+    ~5 accuracy points (e.g. ResNet-18 FT 0.881 → 0.934);
+  * genuinely different methods that may help: lung-region cropping at high resolution (Rajaraman et al., 2018,
+    atlas-based lung ROI at 1024 px, 96.2 %), ensembles (Chouhan et al., 2020, 96.4 % on unseen data). Their
+    validation protocols were not re-checked here.
+- A bias analysis of public pneumonia X-ray datasets (Catalá et al., IEEE Access 2021) also concludes that
+  published results on such datasets may be optimistic.
+
 ## Known open issues (to address in later stages)
 - **Image-size shortcut:** NORMAL images are much larger (median 1654x1323 vs 1160x776). Width
   alone gives test AUC 0.95; an aspect-ratio rule gets 68.6 % test accuracy without pixels.
