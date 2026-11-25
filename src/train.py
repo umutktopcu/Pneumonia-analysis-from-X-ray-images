@@ -7,6 +7,7 @@ Usage (from project root, venv active):
     python src/train.py --run-name smoke --epochs 1 --limit 128               # quick smoke test
     python src/train.py --run-name smallcnn_noweight                          # option (a)
     python src/train.py --run-name smallcnn_posweight --pos-weight auto       # option (b)
+    python src/train.py --run-name resnet18 --model resnet18 --lr 1e-4 --scheduler cosine  # Stage 5
 Outputs (history.csv and learning_curves.png are refreshed after every epoch):
          outputs/runs/<run-name>/{config.json, history.csv, learning_curves.png,
          predictions.csv, metrics.csv} and checkpoints/<run-name>.pt (git-ignored)
@@ -88,7 +89,12 @@ def plot_curves(history: pd.DataFrame, out: Path) -> None:
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--run-name", required=True)
-    p.add_argument("--model", default="small_cnn")
+    p.add_argument("--model", default="small_cnn",
+                   help="small_cnn | resnet18 | densenet121 | efficientnet_b0 (ImageNet-pretrained)")
+    p.add_argument("--freeze-backbone", action="store_true", help="feature extraction: train only the new head")
+    p.add_argument("--scheduler", choices=["none", "cosine"], default="none",
+                   help="cosine: LR decays smoothly from --lr to ~0 over --epochs")
+    p.add_argument("--num-workers", type=int, default=0, help="DataLoader workers (0 on the Mac, ~4 on Kaggle)")
     p.add_argument("--variant", default="sq224", help="cache folder under data/processed (sq224 / sq224_clahe)")
     p.add_argument("--pos-weight", choices=["none", "auto"], default="none",
                    help="auto = n_normal / n_pneumonia in train (class-weighted BCE, option b)")
@@ -112,17 +118,21 @@ def main():
     root = args.processed / args.variant
     train_ds = ChestXrayDataset(splits, "train", root, train=True)
     eval_ds = {s: ChestXrayDataset(splits, s, root) for s in ("val", "test")}
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
-                              generator=torch.Generator().manual_seed(args.seed))
-    eval_loaders = {s: DataLoader(d, batch_size=args.batch_size) for s, d in eval_ds.items()}
+    loader_kw = {"batch_size": args.batch_size, "num_workers": args.num_workers,
+                 "pin_memory": device.type == "cuda"}
+    train_loader = DataLoader(train_ds, shuffle=True, generator=torch.Generator().manual_seed(args.seed), **loader_kw)
+    eval_loaders = {s: DataLoader(d, **loader_kw) for s, d in eval_ds.items()}
 
     n_pos = int(train_ds.labels.sum())
     n_neg = len(train_ds) - n_pos
     # pos_weight multiplies the loss of positive (PNEUMONIA) examples: < 1 down-weights the majority class
     pos_weight = torch.tensor(n_neg / n_pos, device=device) if args.pos_weight == "auto" else None
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-    model = build_model(args.model).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    model = build_model(args.model, freeze_backbone=args.freeze_backbone).to(device)
+    trainable = [t for t in model.parameters() if t.requires_grad]
+    optimizer = torch.optim.AdamW(trainable, lr=args.lr, weight_decay=args.weight_decay)
+    scheduler = (torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+                 if args.scheduler == "cosine" else None)
 
     out_dir = Path("outputs/runs") / args.run_name
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -130,9 +140,11 @@ def main():
     ckpt.parent.mkdir(exist_ok=True)
     config = {**vars(args), "device": str(device), "n_train": len(train_ds), "n_pos": n_pos, "n_neg": n_neg,
               "pos_weight_value": None if pos_weight is None else float(pos_weight),
-              "n_params": sum(t.numel() for t in model.parameters()), "torch": torch.__version__}
+              "n_params": sum(t.numel() for t in model.parameters()),
+              "n_trainable": sum(t.numel() for t in trainable), "torch": torch.__version__}
     (out_dir / "config.json").write_text(json.dumps(config, indent=2, default=str))
-    print(f"device={device}  train={len(train_ds)} (P={n_pos}, N={n_neg})  params={config['n_params']:,}")
+    print(f"device={device}  train={len(train_ds)} (P={n_pos}, N={n_neg})  "
+          f"params={config['n_params']:,}  trainable={config['n_trainable']:,}")
 
     history, best_auc, epochs_without_gain = [], -1.0, 0
     for epoch in range(1, args.epochs + 1):
@@ -140,12 +152,15 @@ def main():
         train_loss, train_scores, train_y = run_epoch(model, train_loader, device, criterion, optimizer)
         val_loss, val_scores, val_y = run_epoch(model, eval_loaders["val"], device, criterion)
         train_auc, val_auc = roc_auc(train_y, train_scores), roc_auc(val_y, val_scores)
-        history.append({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss,
+        lr = optimizer.param_groups[0]["lr"]
+        if scheduler is not None:
+            scheduler.step()  # once per epoch, after the optimizer steps of that epoch
+        history.append({"epoch": epoch, "lr": lr, "train_loss": train_loss, "val_loss": val_loss,
                         "train_auc": train_auc, "val_auc": val_auc})
         pd.DataFrame(history).to_csv(out_dir / "history.csv", index=False)  # saved every epoch,
         plot_curves(pd.DataFrame(history), out_dir / "learning_curves.png")  # so it can be watched live
         print(f"epoch {epoch:2d}  train_loss {train_loss:.4f}  val_loss {val_loss:.4f}  "
-              f"train_auc {train_auc:.4f}  val_auc {val_auc:.4f}  ({time.time() - start:.0f}s)")
+              f"train_auc {train_auc:.4f}  val_auc {val_auc:.4f}  lr {lr:.1e}  ({time.time() - start:.0f}s)")
         if val_auc > best_auc:
             best_auc, epochs_without_gain = val_auc, 0
             torch.save(model.state_dict(), ckpt)

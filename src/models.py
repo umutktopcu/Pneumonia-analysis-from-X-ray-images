@@ -1,6 +1,7 @@
 """Model definitions. build_model(name) is the single entry point used by train.py."""
 import torch
 from torch import nn
+from torchvision import models
 
 
 class SmallCNN(nn.Module):
@@ -30,7 +31,47 @@ class SmallCNN(nn.Module):
         return self.head(x).squeeze(1)  # shape (batch,) of logits
 
 
-def build_model(name: str) -> nn.Module:
-    if name == "small_cnn":
-        return SmallCNN()
+class PretrainedClassifier(nn.Module):
+    """ImageNet-pretrained torchvision backbone whose 1000-class head is replaced by one logit."""
+
+    def __init__(self, backbone: nn.Module, head_attr: str):
+        super().__init__()
+        self.backbone = backbone
+        self.head_attr = head_attr  # name of the replaced final layer, e.g. "fc" or "classifier"
+
+    def head_parameters(self):
+        return getattr(self.backbone, self.head_attr).parameters()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.backbone(x).squeeze(1)
+
+
+def _pretrained(name: str) -> PretrainedClassifier:
+    if name == "resnet18":
+        m = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+        m.fc = nn.Linear(m.fc.in_features, 1)
+        return PretrainedClassifier(m, "fc")
+    if name == "densenet121":
+        m = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
+        m.classifier = nn.Linear(m.classifier.in_features, 1)
+        return PretrainedClassifier(m, "classifier")
+    if name == "efficientnet_b0":
+        m = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
+        m.classifier[1] = nn.Linear(m.classifier[1].in_features, 1)  # classifier = Dropout + Linear
+        return PretrainedClassifier(m, "classifier")
     raise ValueError(f"unknown model: {name}")
+
+
+def build_model(name: str, freeze_backbone: bool = False) -> nn.Module:
+    """freeze_backbone=True -> feature extraction: only the new head is trained."""
+    if name == "small_cnn":
+        if freeze_backbone:
+            raise ValueError("small_cnn has no pretrained backbone to freeze")
+        return SmallCNN()
+    model = _pretrained(name)
+    if freeze_backbone:
+        for param in model.parameters():
+            param.requires_grad = False
+        for param in model.head_parameters():
+            param.requires_grad = True
+    return model
