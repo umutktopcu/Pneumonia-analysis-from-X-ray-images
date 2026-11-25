@@ -148,6 +148,45 @@ loss weighting cannot fix.
   calibration jumps, not overfitting (the lower envelope of val loss keeps falling; no train-val AUC gap).
   Likely BatchNorm running statistics + constant LR (hypothesis). Model selection uses val AUC, so unaffected.
 
+## D12 — Model-selection rule when validation is saturated (Stage 5, 2026-11-25)
+**Problem:** pretrained models reach val AUC ≈ 0.999 within 1–3 epochs; val (same distribution as train)
+can no longer separate models or epochs.
+**Rule (proposed in the session before the Stage 5 comparison table was computed; the user had already
+seen the raw test lines printed by train.py):** rank by (1) val ROC-AUC, then (2) val AUC on the
+*shortcut-conflicting* subset (val images the image-size-only model misclassifies: 194 images, only 23
+NORMAL — noisy), then (3) val BCE loss; if still indistinguishable, (4) prefer the simpler model.
+Test is never used for selection.
+**Outcome:** the rule selects **EfficientNet-B0** (best on all three val criteria) — which has the
+**lowest** test AUC of the pretrained models (0.936). See Stage 5 findings.
+
+## Stage 5 findings (2026-11-25) — `src/05_compare_runs.py`, `outputs/05_transfer/comparison.csv`
+All runs: seed 42, AdamW, cosine LR (except SmallCNN), ≤15 epochs, early stopping on val AUC (patience 5),
+Kaggle T4. "conflict" = shortcut-conflicting subset (val 194 / test 104 images).
+
+| run | val AUC | val conflict AUC | val loss | test AUC [95% bootstrap CI] | test conflict AUC | test sens | test spec |
+|---|---|---|---|---|---|---|---|
+| efficientnet_b0_ft | 0.9996 | 0.995 | 0.023 | 0.936 [0.912, 0.958] | 0.759 | 0.995 | 0.701 |
+| densenet121_ft | 0.9994 | 0.993 | 0.073 | 0.975 [0.961, 0.986] | 0.757 | 0.997 | 0.739 |
+| resnet18_ft | 0.9993 | 0.990 | 0.031 | 0.971 [0.955, 0.984] | 0.847 | 0.997 | 0.688 |
+| resnet18_ft_clahe | 0.9992 | 0.987 | 0.050 | 0.981 [0.971, 0.989] | 0.828 | 0.997 | 0.697 |
+| smallcnn_noweight | 0.9980 | 0.966 | 0.070 | 0.945 [0.923, 0.964] | 0.628 | 0.992 | 0.594 |
+| resnet18_frozen | 0.9901 | 0.916 | 0.134 | 0.952 [0.933, 0.968] | 0.724 | 0.967 | 0.786 |
+
+- **Main finding: in-distribution validation does not predict performance on the official test set.**
+  The val ranking (EfficientNet first) is essentially unrelated to the test ranking (EfficientNet last among
+  pretrained models). No val-only criterion we have — AUC, conflict-subset AUC, loss — fixes this, because the
+  test set differs from train/val in ways val does not contain (Stage 4: test NORMAL images look
+  pneumonia-like to every model).
+- Pretrained fine-tuning beats SmallCNN on test AUC and is much better on shortcut-conflicting test images
+  (0.76–0.85 vs 0.59–0.63) → less reliance on the image-size cue, not none.
+- Test AUC differences among DenseNet-121, ResNet-18 and ResNet-18+CLAHE are within overlapping CIs; picking the
+  "best" of them by test AUC would be selection on the test set. They are reported as a benchmark, not ranked.
+- The frozen ResNet-18 (feature extraction) has the lowest val AUC but the highest test specificity (0.786).
+- Early stopping on a saturated val AUC chooses the "best" epoch among near-ties (DenseNet: epoch 1). This is a
+  symptom of the same problem, not its cause.
+- Every additional experiment judged on test increases the risk of adapting to the test set (test reuse);
+  further experiments must be few and declared in advance.
+
 ## Known open issues (to address in later stages)
 - **Image-size shortcut:** NORMAL images are much larger (median 1654x1323 vs 1160x776). Width
   alone gives test AUC 0.95; an aspect-ratio rule gets 68.6 % test accuracy without pixels.
