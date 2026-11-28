@@ -1,0 +1,13 @@
+model,subtype,detected,n,sensitivity [95% Wilson]
+smallcnn_noweight,bacteria,238,242,"0.983 [0.958, 0.994]"
+smallcnn_noweight,virus,146,148,"0.986 [0.952, 0.996]"
+resnet18_frozen,bacteria,232,242,"0.959 [0.926, 0.977]"
+resnet18_frozen,virus,147,148,"0.993 [0.963, 0.999]"
+resnet18_ft,bacteria,235,242,"0.971 [0.942, 0.986]"
+resnet18_ft,virus,146,148,"0.986 [0.952, 0.996]"
+resnet18_ft_clahe,bacteria,236,242,"0.975 [0.947, 0.989]"
+resnet18_ft_clahe,virus,144,148,"0.973 [0.933, 0.989]"
+densenet121_ft,bacteria,238,242,"0.983 [0.958, 0.994]"
+densenet121_ft,virus,142,148,"0.959 [0.914, 0.981]"
+efficientnet_b0_ft,bacteria,234,242,"0.967 [0.936, 0.983]"
+efficientnet_b0_ft,virus,141,148,"0.953 [0.906, 0.977]"

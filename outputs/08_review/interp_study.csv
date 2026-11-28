@@ -1,0 +1,4 @@
+method,class_separability,rho_height_NORMAL,rho_height_PNEUMONIA
+INTER_NEAREST,0.9,0.22,0.51
+INTER_LINEAR,0.898,0.3,0.55
+INTER_AREA,0.876,0.18,0.39

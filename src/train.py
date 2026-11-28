@@ -104,6 +104,9 @@ def main():
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--weight-decay", type=float, default=1e-4)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--select", choices=["best_val", "last"], default="best_val",
+                   help="best_val: checkpoint with the best val AUC + early stopping (default, as in Stages 4-6); "
+                        "last: fixed epoch budget, keep the final epoch (no selection on a saturated val)")
     p.add_argument("--limit", type=int, default=0, help="debug: use only this many images per split")
     p.add_argument("--splits", type=Path, default=Path("outputs/02_splits/splits.csv"))
     p.add_argument("--processed", type=Path, default=Path("data/processed"))
@@ -161,7 +164,10 @@ def main():
         plot_curves(pd.DataFrame(history), out_dir / "learning_curves.png")  # so it can be watched live
         print(f"epoch {epoch:2d}  train_loss {train_loss:.4f}  val_loss {val_loss:.4f}  "
               f"train_auc {train_auc:.4f}  val_auc {val_auc:.4f}  lr {lr:.1e}  ({time.time() - start:.0f}s)")
-        if val_auc > best_auc:
+        if args.select == "last":
+            best_auc = max(best_auc, val_auc)
+            torch.save(model.state_dict(), ckpt)  # overwritten every epoch: the final epoch is kept
+        elif val_auc > best_auc:
             best_auc, epochs_without_gain = val_auc, 0
             torch.save(model.state_dict(), ckpt)
         else:
@@ -186,8 +192,12 @@ def main():
     pd.concat(preds).to_csv(out_dir / "predictions.csv", index=False)
     metrics.to_csv(out_dir / "metrics.csv", index=False)
     cols = ["split", "threshold", "accuracy", "sensitivity", "specificity", "f1", "roc_auc"]
-    print(f"\nbest val AUC {best_auc:.4f} (epoch {int(history.loc[history.val_auc.idxmax(), 'epoch'])})")
-    print(metrics[cols].round(3).to_string(index=False))
+    kept = "final epoch (--select last)" if args.select == "last" else "best val AUC epoch"
+    print(f"\nbest val AUC {best_auc:.4f} (epoch {int(history.loc[history.val_auc.idxmax(), 'epoch'])}); "
+          f"checkpoint kept: {kept}")
+    # Only val is printed: test results are in metrics.csv / predictions.csv and are looked at once, at the end
+    # (Stage 8 lesson: test numbers seen during development influence later choices).
+    print(metrics.loc[metrics.split == "val", cols].round(3).to_string(index=False))
 
 
 if __name__ == "__main__":

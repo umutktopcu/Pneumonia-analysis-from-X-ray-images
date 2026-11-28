@@ -1,0 +1,4 @@
+group,seed,run,val_auc,test_auc,test_sens,test_spec,test_acc
+resnet18_ft,42,resnet18_ft,0.9993,0.9707,0.9769,0.8291,0.9215
+resnet18_ft_clahe,42,resnet18_ft_clahe,0.9992,0.9811,0.9744,0.8547,0.9295
+densenet121_ft,42,densenet121_ft,0.9994,0.9754,0.9744,0.8291,0.9199
